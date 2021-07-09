@@ -1,0 +1,540 @@
+version: "3.9"
+services:
+
+  web:                    
+    build:
+      context: ./dir                 # путь к папке с dockerfile или url git repo
+      dockerfile: Dockerfile-alt     # название Dockerfile из которого будет создан образ
+      args:                          # аргументы
+        buildno: 1
+    image: webapp:tag                # будет создан образ с таким именем и тегом
+    ports:                           # локальный порт:порт контейнера
+      - "5000:5000"
+    volumes:                         # локальная папка:папка контейнера
+      - .:/code
+    environment:                     # переменные окружения
+      - FLASK_ENV: development
+      - DEBUG=1
+    env_file:                        # файл переменных окружения
+      - ./Docker/api/api.env
+
+  redis:
+    image: "redis:alpine"            # создаем сервис из образа
+    command: myapp migrate           # команда CMD
+    depends_on:                      # зависимости(будет ждать когда запуститься база)
+      - db
+    profiles:
+      - tools
+    extends:
+      file: common-services.yml
+      service: webapp  
+    networks:                        # сети с которыми работает контейнер
+      - frontend 
+
+# управление сетями
+networks:
+
+  frontend:
+    driver: custom-driver-1                    # Use a custom driver
+
+  backend:
+    driver: custom-driver-2                    # Use a custom driver which takes special options
+    driver_opts:
+    foo: "1"
+    bar: "2"
+
+
+# управление хранилищами
+volumes:
+
+  logvolume01: {}
+
+
+
+
+
+# =============================================================================================================================
+# DOCKER_COMPOSE V3
+# =============================================================================================================================
+# official docs: https://docs.docker.com/compose/compose-file/compose-file-v3
+# examples:      https://github.com/search?q=in%3Apath+docker-compose.yml+extension%3Ayml&type=Code
+
+services:
+# здесь определяются сервисы- будущие контейнеры
+
+  my_servies:
+  # описание будущего контейнера
+
+    build:
+    # создание контейнера
+
+      context: ./dir
+      # путь к папке с dockerfile или url git repo
+
+      dockerfile: Dockerfile-alternate
+      # можно указать альтернативное название Dockerfile из которого будет создан образ
+      # если не указывать, то по умолчанию будет выполнен Dockerfile
+
+      args:
+        buildno: 1
+        gitcommithash: cdc3b19
+        - buildno=1
+        - gitcommithash=cdc3b19
+      # передает значения аргументам Dockerfile для сборки образа. Они доступны только при сборке.
+      # здесь показаны 2 варианта передачи аргументов
+      # если какое то значение из Dockerfile не указывать, то оно будет взято из окружения выполняемого docker-compose
+
+      cache_from:
+        - alpine:latest
+        - corp/web_app:3.14
+      # список образов для разрешения кеша
+
+      labels:
+        com.example.description: "Accounting webapp"
+        com.example.label-with-empty-value: ""
+        - "com.example.description=Accounting webapp"
+        - "com.example.label-with-empty-value"
+      # добавляет метаданные в конечный образ
+      # рекомендуется использовать обратную нотацию DNS, чтобы метки не конфликтовали с метками другого ПО
+      # здесь показаны 2 варианта передачи значений
+
+      network:
+      # устанавливает сеть для доступа к инструкциям RUN во время сборки
+      # network: host
+      # network: custom_network_1  устанавливает свою сеть для сборки
+      # network: none              отключает сеть во ремя сборки
+
+      shm_size: '2gb'
+      # устанавливает размер /dev/shm для создаваемого контейнера
+      # можно указать в байтах shm_size: 10000000
+
+      target: prod
+      # сборка определенного шага при мульстейджинге, определеннго в Dockerfile
+
+
+
+    cap_add:
+      - ALL
+    # добавление возможностей контейнера
+
+
+    cap_drop:
+      - NET_ADMIN
+      - SYS_ADMIN
+    # удаление возможностей контейнера
+
+
+    cgroup_parent: m-executor-abcd
+    # определет родительскую группу для контейнера
+
+
+    command: bundle exec thin -p 3000
+    command: ["bundle", "exec", "thin", "-p", "3000"]
+    # переопределяет команду по умолчанию после запуска кнтейнера
+    # здесь показаны 2 варианта: shell и json
+
+
+    configs:
+      - my_config
+      - my_other_config
+    # предоставляет доступ к конфигам. 
+    # конфиги my_config и my_other_config должны быть определены на самом внешнем уровне:
+configs:
+  my_config:          
+    file: ./my_config.txt      # имя_конфига.txt внутри контейнера = имя_конфига
+  my_other_config:
+    external: true             # инструкция говорит, что конфиг определен вне контейнера. Если не найдет - ошибка.
+
+  
+    container_name: my-web-container
+    # задает имя контейнера вместо генерируемого по умолчанию
+    # имя должно быть уникальным
+
+
+    credential_spec:
+      file: my-credential-spec.json
+    # учетные данные
+
+
+    depends_on:
+      - db
+      - redis
+    # сервис зависит от других сервисов. Пока они не будут запущены, сервис не запустится
+    # depends_on не ждет, пока db и redis будут готовы перед запуском сети
+    # depends_on игнорируется при развертывании стека в режиме роя 
+
+
+    deploy:
+      replicas: 6
+      placement:
+        max_replicas_per_node: 1
+      update_config:
+        parallelism: 2
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+    # конфигурация для деплоя и запуска сервисов
+    # работает только при развертывании с помощью swarm with docker stack deploy
+    # ИГНОРИРУЕТСЯ docker-compose up и docker-compose run. 
+    # можно настраивать репликацию, ограничивать потребление контейнером памяти и процессора
+    # можно настраивать политику рестарта
+    # можно настраивать политику апдейта и отката в случае неудачи апдейта
+
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
+    # подключение устройств
+
+
+    dns:
+      - 8.8.8.8
+      - 9.9.9.9
+    # кастомный сервер имен
+
+
+    dns_search:
+      - dc1.example.com
+      - dc2.example.com
+    # кастомный сервер для поиска имен
+
+
+    entrypoint: /code/entrypoint.sh
+    entrypoint: ["php", "-d", "memory_limit=-1", "vendor/bin/phpunit"]
+    # переопределение entrypoint по умолчанию в Dockerfile
+    # блокирует выполнение CMD в Dockerfile
+
+
+    env_file: .env
+    env_file:
+      - ./common.env
+      - ./apps/web.env
+      - /opt/runtime_opts.env
+    # добавление переменных окружения из файла
+    # здесь показаны 2 варианта добавления
+    # переменные объявленные в секции environment переопределяют переменные env_file
+    # при совпадении переменных из 2 списков, используется последнее
+
+
+    environment:
+      RACK_ENV: development
+      SHOW: 'true'
+      - RACK_ENV=development
+      - SHOW=true
+    # переменные окружения из environment переопределяют любые ранее объявленные
+    # здесь показаны 2 варианта объявления переменных
+    # логические значения при передечив формате словаря должны быть в кавычках
+
+
+    expose:
+      - "3000"
+      - "8000"
+      # открывает порты, не публикуя их на главном компьютере - они будут доступны только для связанных служб
+
+    
+    external_links:
+      - redis_1
+      - project_db_1:mysql
+      - project_db_1:postgresql
+    # внешние ссылки для создаваемых извне контейнеров вида CONTAINER:ALIAS
+    # Это устаревший вариант - лучше использовать сети.
+      
+
+    extra_hosts:
+      - "somehost:162.242.195.82"
+      - "otherhost:50.31.209.229"
+    # сопоставление иммен хостов
+    # запись с именем хоста и IP-адресом создается в /etc/hosts внутри контейнера
+
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # настройка проверки работоспособности контейнера
+
+
+    image: alpine:latest
+    image: tutum/influxdb
+    image: example-registry.com:4000/postgresql
+    image: a4bc65fd
+    # какой образ взять для сборки
+
+
+    labels:
+      - "com.example.description=Accounting webapp"
+      - "com.example.label-with-empty-value"
+      com.example.description: "Accounting webapp"
+      com.example.label-with-empty-value: ""
+    # добавление метаданных в контейнер
+    # используется обратная DNS нотация
+
+
+    links:
+      - "db"
+      - "db:database"
+      - "redis"
+    # ссылки на контейнеры в другом сервисе
+    # ссылки как и depends_on определяют порядок запуска службы
+
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    # логгер, по дефолту json
+
+
+    network_mode: "bridge"
+    # сетевой  режим
+
+
+    networks:
+      - some-network
+      - other-network
+    # сети к которым будет подсоединен контейнер
+    # сети должны быть определены на саом верхнем уровне
+
+
+    networks:
+      some-network:
+        aliases:
+          - alias1
+          - alias3
+      other-network:
+        aliases:
+          - alias2
+    # алиасы - альтернативные имена для сервиса в сети
+    # в примере определены имена для сервиса в двух сетях
+    # один сервис может иметь разные псевдонимы в разных сетях
+
+    networks:
+      app_net:
+        ipv4_address: 172.16.238.10
+        ipv6_address: 2001:3984:3989::10
+    # статический адрес для контейнера в этом сервисе
+
+    
+    pid: "host"
+    # устанавливает режим PID в режим PID хоста
+    # это включает совместное использование контейнером и ОС хоста адресного пространства PID. Контейнеры, запущенные с этим флагом, могут получать доступ и управлять другими контейнерами в пространстве имен машины без ОС и наоборот. 
+
+    ports:
+      - "3000"
+      - "3000-3005"
+      - "8000:8000"
+      - "9090-9091:8080-8081"
+      - "49100:22"
+      - "127.0.0.1:8001:8001"
+      - "127.0.0.1:5000-5010:5000-5010"
+      - "127.0.0.1::5000
+      - "6060:6060/udp"
+      - "12400-12500:1240"
+    # открывает порты и сопоставляет порты
+    # можно указать только порт конейнера(для хоста будет назначен временный порт)
+    # можно указать сопоставление портов HOST:CONTAINER. Лучше указывать значение в виде строк.
+    # можно указать ip-адрес хоста для привязки к обоим портам IPADDR:HOSTPORT:CONTAINERPORT
+    # по умолчанию 0.0.0.0:HOSTPORT:CONTAINERPORT (означает все интерфейсы)
+    # если HOSTPORT пустой 127.0.0.1::80 будет назначен временный порт
+
+
+    profiles: ["frontend", "debug"]
+    profiles:
+      - frontend
+      - debug
+    # запускает контейнер в следующих профилях
+    # если профиль не указан, контейнер будет запущен всегда
+    # здесь показаны 2 варианта объявления профилей
+
+
+    restart: "no"
+    restart: always
+    restart: on-failure
+    restart: unless-stopped
+    # определяет перезапуск контейнера
+    # никогда, всегда, при отказе и наличии ошибки, всегда если не остановлен вручную
+
+
+    secrets:
+      - my_secret
+      - my_other_secret
+    # предоставляет контейнеру секреты
+    # секреты должны быть определены на самом верхнем уровне
+
+
+    security_opt:
+      - label:user:USER
+      - label:role:ROLE
+    # переопределяет название каждого контейнера по умолчанию
+
+
+    stop_grace_period: 1m30s
+    # указывает сколько ждать при попытке осановить контейнер после SIGKILL.
+    # по умолчанию 10 сек
+
+
+    stop_signal: SIGUSR1
+    # альтернативный сигнал для остановки контейнера
+
+
+    sysctls:
+      net.core.somaxconn: 1024
+      net.ipv4.tcp_syncookies: 0
+      - net.core.somaxconn=1024
+      - net.ipv4.tcp_syncookies=0
+    # параметры ядра для установки в контейнер
+
+
+    tmpfs: /run
+    tmpfs:
+      - /run
+      - /tmp
+      size: 1000
+    # монтирует временную файловую систему внутри контейнера
+    # устанавливает размер, по умолчанию - без лимита
+
+
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 20000
+        hard: 40000
+    # переопределяет ulimits для контейнера 
+
+
+    userns_mode: "host"
+    # отключает пространство имен пользователя для этого контейнера(если он был включен ранее докердемоном)
+
+
+    volumes:
+      - type: volume
+        source: mydata
+        target: /data
+        volume:
+          nocopy: true
+      - type: bind
+        source: ./static
+        target: /opt/app/static
+    # type - volume, bind, tmpfs or npipe
+    # source-  путь к папке хоста или имя верхнего уровня хранилища
+    # target - папка в контейнере куда монтировать 
+    # read_only - только для чтения
+    # bind - дополнительын параметры привязки
+    # volume - конфигурирует дополнительные параметры. nocopy: запрещает копирование данных из контейнера при создании хранилища
+    # tmpfs - дополнительын опции tmpfs. size - разер в байтах.
+    # При отсутвии именованных томов, докер создает анонимный том кторый удаляется после удаления связанных контейнеров.
+    
+    
+    тип, откуда, куда
+
+
+    volumes:
+      - "/var/run/postgres/postgres.sock:/var/run/postgres/postgres.sock"
+      - "dbdata:/var/lib/postgresql/data"
+    # хранилаща данных
+    # сопоставление сокетов
+    # сопоставление хранилища с папкой внутри контейнера(старый формат подключения хранилища)
+    
+volumes:
+  mydata:
+  - dbdata:/var/lib/mysql
+# хранилища данных, определенные на самом верхнем уровне
+# определение на верхнем уровне позволяет удобнее переиспользовать хранилище в нескольких службах
+
+    
+    
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+      
+
+    
+
+
+
+      
+    
+
+
+    
+    
+    
+    
+    
+
+
+
+
+
+
+    
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+# === environment
+переменные окружения в environment приоритетнее переменных из env_file
+
+
+
+
+
+
+
+
+
+# =============================================================================================================================
+# MOST POPULAR Compose CLI environment variables
+# =============================================================================================================================
+
+COMPOSE_PROJECT_NAME    
+# имя проекта. Используется в создании имен контейнеров и сетей. projectname_containername
+# По дефолту COMPOSE_PROJECT_NAME=basename, а оно = имени текущей папки с файлом docker-compose.yml
+
+COMPOSE_FILE
+# название файла, которое будет использовано в команде docker-compose up
+# По дефолту COMPOSE_FILE docker-compose.yml
+
+COMPOSE_PROFILES
+# Использование профиля по умолчанию в команде docker-compose up
+# Например при COMPOSE_PROFILES=frontend,debug, будет вызван профиль frontend и debug.
+

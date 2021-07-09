@@ -1,0 +1,46 @@
+# https://pythonspeed.com/
+
+# база
+ARG = PYTHON_VERSION=3.7.6
+FROM python:${PYTHON_VERSION}-stretch AS base
+RUN python -m venv /opt/venv
+
+# вариант для прода
+FROM base AS prod-builder
+COPY requirements.txt .
+RUN /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# вариант прод+дев
+FROM prod-builder AS dev-builder
+COPY requirements.txt .
+RUN /opt/venv/bin/pip install --no-cache-dir -r requirements-dev.txt
+
+
+# вариант для тестов(прод + дев + тест)
+ARG APP_ENV=prod
+FROM ${APP_ENV}-builder AS builder
+
+
+FROM python:${PYTHON_VERSION}-slim-stretch AS test
+COPY --from=dev-builder /opt/venv /opt/venv
+CMD [ "pytest" ]
+
+
+FROM python:${PYTHON_VERSION}-slim-stretch AS release
+COPY --from=builder /opt/venv /opt/venv
+EXPOSE 8000
+CMD [ "gunicorn", "..." ]
+
+
+# ===== CLI ====================================================================================
+
+# no dev packages
+docker build -t release:v20.0.6 .
+
+
+# dev + test
+docker build -t test-image --target=test .
+
+
+# dev + release
+docker build -t dev-image --build-args APP_ENV=dev .
